@@ -4,7 +4,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
-const encrypt = require('mongoose-encryption')
+//const encrypt = require('mongoose-encryption')
+//const md5 = require('md5'); 
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 
@@ -19,7 +22,7 @@ const UserSchema= new mongoose.Schema({
     password:String
 });
 
-UserSchema.plugin(encrypt,{secret:process.env.SECRET,encryptedFields:["password"]});
+//UserSchema.plugin(encrypt,{secret:process.env.SECRET,encryptedFields:["password"]});
 
 const User= mongoose.model("User",UserSchema);
 
@@ -36,26 +39,37 @@ app.get("/register",function(req,res){
 })
 
 app.post("/register",function(req,res){
-    const newUser= new User({
+    bcrypt.hash(req.body.password, saltRounds).then(function(hashPassword) {
+         const newUser= new User({
         username:req.body.username,
-        password:req.body.password
+        password:hashPassword
     })
     newUser.save().then(function(){
         res.render("secrets")
     }).catch(function(err){
         console.log(err)
     })
+    
+});
+
+   
 })
 
 app.post("/login",function(req,res){
     const username= req.body.username;
     const password= req.body.password;
+
+    
+    
     User.findOne({username:username}).then(function(foundUser){
         if(foundUser){
-            if(foundUser.password===password)
-                res.render("secrets")
-            else
-                res.send("Invalid Password")
+            bcrypt.compare(password, foundUser.password).then(function(result) {
+                if(result)
+                    res.render("secrets")
+                else
+                    res.send("Invalid Password")
+
+            });
         }
         else {
             res.send("Invalid UserName")
